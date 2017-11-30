@@ -40,7 +40,13 @@ class Player {
 public:
     VariantMap identity;
 
+    Node* pNode;
+    StaticModel* pObject;
+    RigidBody* pRigidBody;
+    CollisionShape* pCollisionShape;
+
     // Methods
     Player();
     void Initialise(ResourceCache *pRes, Scene *pScene, VariantMap& identity);
+    void ApplyControls(const Controls& controls);
 };

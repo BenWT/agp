@@ -33,7 +33,7 @@
 
 #include "Main.h"
 
-static const StringHash E_NEWPLAYERINDEX("NewPlayerIndex");
+static const StringHash E_CLIENTCAMERAPOSITION("ClientCameraPosition");
 
 URHO3D_DEFINE_APPLICATION_MAIN(Main)
 
@@ -74,8 +74,8 @@ void Main::SubscribeToEvents() {
     SubscribeToEvent(E_CLIENTCONNECTED, URHO3D_HANDLER(Main, HandleClientConnected));
     SubscribeToEvent(E_CLIENTDISCONNECTED, URHO3D_HANDLER(Main, HandleClientDisconnected));
 
-    SubscribeToEvent(E_NEWPLAYERINDEX, URHO3D_HANDLER(Main, GetPlayerIndex));
-    GetSubsystem<Network>()->RegisterRemoteEvent(E_NEWPLAYERINDEX);
+    SubscribeToEvent(E_CLIENTCAMERAPOSITION, URHO3D_HANDLER(Main, GetClientCameraPosition));
+    GetSubsystem<Network>()->RegisterRemoteEvent(E_CLIENTCAMERAPOSITION);
 }
 
 void Main::CreateMainMenu(bool isClient) {
@@ -161,14 +161,12 @@ void Main::CreateGameScene(bool isClient) {
         // TODO: load server stuff
     }
 }
-int Main::CreateCharacter(VariantMap& identity) {
+void Main::CreateCharacter(VariantMap& identity) {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
 
     Player p;
     p.Initialise(cache, scene_, identity);
     playerList.Push(p);
-
-    return playerList.Size() - 1;
 }
 
 void Main::HandlePhysicsPreStep(StringHash eventType, VariantMap& eventData) {
@@ -198,16 +196,14 @@ void Main::HandlePostUpdate(StringHash eventType, VariantMap& eventData) {
 void Main::HandleClientConnected(StringHash eventType, VariantMap& eventData) {
     using namespace ClientConnected;
 
-    VariantMap playerIndex;
     Connection* newConnection = static_cast<Connection*>(eventData[P_CONNECTION].GetPtr());
 
     newConnection->SetScene(scene_);
 
-    playerIndex["index"] = CreateCharacter(newConnection->GetIdentity());;
-    newConnection->SendRemoteEvent(E_NEWPLAYERINDEX, true, playerIndex);
+    CreateCharacter(newConnection->GetIdentity());
 }
 void Main::HandleClientDisconnected(StringHash eventType, VariantMap& eventData) {
-    // TODO: implement
+    // TODO: Implement HandleClientDisconnected
     printf("HandleClientDisconnected");
     // remove from player list by identity
 }
@@ -222,7 +218,7 @@ void Main::HandleConnect(StringHash eventType, VariantMap& eventData) {
     menuVisible_ = false;
 }
 void Main::HandleDisconnect(StringHash eventType, VariantMap& eventData) {
-    // TODO: implement
+    // TODO: Implement HandleDisconnect
     printf("HandleDisconnect");
 }
 void Main::HandleStartServer(StringHash eventType, VariantMap& eventData) {
@@ -244,17 +240,25 @@ void Main::ClientPrePhysics(float timeStep) {
     Connection* serverConnection = network->GetServerConnection();
 
     if (serverConnection) {
-        serverConnection->SetPosition(cameraNode_->GetPosition());
+        // serverConnection->SetPosition(cameraNode_->GetPosition());
         serverConnection->SetControls(ClientToServerControls());
     }
 }
 void Main::ServerUpdate(float timeStep) {
-    // TODO: implement
+    // TODO: Make local camera follow server player
     // Boids will update here and should be synced
 }
 void Main::ClientUpdate(float timeStep) {
-    // TODO: implement
-    printf()
+    // printf("%d ", playerList.Size());
+    //
+    // if (playerIndex >= 0 && playerIndex < playerList.Size()) {
+    //     printf("%d", playerList[playerIndex].pNode->GetPosition().x_);
+    //     printf(" ");
+    //     printf("%d", playerList[playerIndex].pNode->GetPosition().z_);
+    //     printf("\n");
+    //
+    //     cameraNode_->SetPosition(playerList[playerIndex].pNode->GetPosition());
+    // }
 }
 
 Controls Main::ClientToServerControls() {
@@ -270,7 +274,31 @@ Controls Main::ClientToServerControls() {
 
     return controls;
 }
+void Main::ProcessClientControls() {
+    Network* network = GetSubsystem<Network>();
+    const Vector<SharedPtr<Connection> >& connections = network->GetClientConnections();
 
-void Main::GetPlayerIndex(StringHash eventType, VariantMap& eventData) {
-    printf("Player: " + eventData["index"].ToString());
+    for (unsigned i = 0; i < connections.Size(); ++i) {
+        Connection* connection = connections[i];
+
+        for (Vector<Player>::Iterator p = playerList.Begin(); p != playerList.End(); p++) {
+            if (p->identity == connection->GetIdentity() && p->pNode != NULL) {
+                p->ApplyControls(connection->GetControls());
+                // send camera position here
+                VariantMap cameraPos;
+                cameraPos["positionX"] = p->pNode->GetPosition().x_;
+                cameraPos["positionY"] = p->pNode->GetPosition().y_;
+                cameraPos["positionZ"] = p->pNode->GetPosition().z_;
+
+                connection->SendRemoteEvent(E_CLIENTCAMERAPOSITION, true, cameraPos);
+            }
+        }
+    }
+}
+
+void Main::GetClientCameraPosition(StringHash eventType, VariantMap& eventData) {
+    // move camera here
+    // printf("%d ", eventData["positionX"].GetDouble());
+
+    printf("camera moved to %f %f %f \n", eventData["positionX"].GetDouble(), eventData["positionY"].GetDouble(), eventData["positionZ"].GetDouble());
 }

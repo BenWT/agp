@@ -22,7 +22,6 @@ public:
 
     Player serverPlayer;
     Vector<Player> playerList;
-    int playerIndex = -1;
 
     virtual void Start();
 
@@ -57,5 +56,5 @@ private:
 
     Controls ClientToServerControls();
     void ProcessClientControls();
-    void GetPlayerIndex(StringHash eventType, VariantMap& eventData);
+    void GetClientCameraPosition(StringHash eventType, VariantMap& eventData);
 };
