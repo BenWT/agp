@@ -8,7 +8,7 @@ Player::Player() {
     pCollisionShape = nullptr;
 }
 
-void Player::Initialise(ResourceCache *pRes, Scene *pScene, VariantMap& identity) {
+void Player::Initialise(ResourceCache *pRes, Scene *pScene) {
     pNode = pScene->CreateChild("Player");
     pNode->SetPosition(Vector3(Random(40.0f) - 20.0f, 15.0f, Random(40.0f) - 20.0f));
 
@@ -18,7 +18,7 @@ void Player::Initialise(ResourceCache *pRes, Scene *pScene, VariantMap& identity
     pObject->SetCastShadows(true);
 
     pRigidBody = pNode->CreateComponent<RigidBody>();
-    pRigidBody->SetUseGravity(false);
+    pRigidBody->SetUseGravity(true);
     pRigidBody->SetMass(1.0f);
     pRigidBody->SetCollisionLayer(1);
 

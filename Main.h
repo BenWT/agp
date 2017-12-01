@@ -20,8 +20,8 @@ public:
     LineEdit* serverAddress;
     SharedPtr<Window> window_;
 
-    Player serverPlayer;
-    Vector<Player> playerList;
+    unsigned clientObjectID_ = 0;
+    HashMap<Connection*, Player*> serverObjects_;
 
     virtual void Start();
 
@@ -33,7 +33,7 @@ private:
     // Object Creators
     void CreateMainMenu(bool isClient);
     void CreateGameScene(bool isClient);
-    void CreateCharacter(VariantMap& identity);
+    Player* CreateCharacter();
 
     // Urho Event Handlers
     void HandleUpdate(StringHash eventType, VariantMap& eventData);
@@ -42,10 +42,15 @@ private:
     void HandleClientConnected(StringHash eventType, VariantMap& eventData);
     void HandleClientDisconnected(StringHash eventType, VariantMap& eventData);
 
-    // Custom Events
+    // Custom Network Events
+    void HandleServerToClientObjectID(StringHash eventType, VariantMap& eventData);
+    void HandleClientToServerReadyToStart(StringHash eventType, VariantMap& eventData);
+
+    // Menu Events
     void HandleConnect(StringHash eventType, VariantMap& eventData);
     void HandleDisconnect(StringHash eventType, VariantMap& eventData);
     void HandleStartServer(StringHash eventType, VariantMap& eventData);
+    void HandleClientStartGame(StringHash eventType, VariantMap & eventData);
     void HandleQuit(StringHash eventType, VariantMap& eventData);
 
     // Game logic
@@ -56,5 +61,4 @@ private:
 
     Controls ClientToServerControls();
     void ProcessClientControls();
-    void GetClientCameraPosition(StringHash eventType, VariantMap& eventData);
 };

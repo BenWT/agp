@@ -38,8 +38,6 @@ using namespace Urho3D;
 
 class Player {
 public:
-    VariantMap identity;
-
     Node* pNode;
     StaticModel* pObject;
     RigidBody* pRigidBody;
@@ -47,6 +45,6 @@ public:
 
     // Methods
     Player();
-    void Initialise(ResourceCache *pRes, Scene *pScene, VariantMap& identity);
+    void Initialise(ResourceCache *pRes, Scene *pScene);
     void ApplyControls(const Controls& controls);
 };

@@ -33,7 +33,9 @@
 
 #include "Main.h"
 
-static const StringHash E_CLIENTCAMERAPOSITION("ClientCameraPosition");
+static const StringHash E_CLIENTOBJECTAUTHORITY("ClientObjectAuthority");
+static const StringHash PLAYER_ID("IDENTITY");
+static const StringHash E_CLIENTISREADY("ClientReadyToStart");
 
 URHO3D_DEFINE_APPLICATION_MAIN(Main)
 
@@ -74,8 +76,10 @@ void Main::SubscribeToEvents() {
     SubscribeToEvent(E_CLIENTCONNECTED, URHO3D_HANDLER(Main, HandleClientConnected));
     SubscribeToEvent(E_CLIENTDISCONNECTED, URHO3D_HANDLER(Main, HandleClientDisconnected));
 
-    SubscribeToEvent(E_CLIENTCAMERAPOSITION, URHO3D_HANDLER(Main, GetClientCameraPosition));
-    GetSubsystem<Network>()->RegisterRemoteEvent(E_CLIENTCAMERAPOSITION);
+    SubscribeToEvent(E_CLIENTISREADY, URHO3D_HANDLER(Main, HandleClientToServerReadyToStart));
+    GetSubsystem<Network>()->RegisterRemoteEvent(E_CLIENTISREADY);
+    SubscribeToEvent(E_CLIENTOBJECTAUTHORITY, URHO3D_HANDLER(Main, HandleServerToClientObjectID));
+    GetSubsystem<Network>()->RegisterRemoteEvent(E_CLIENTOBJECTAUTHORITY);
 }
 
 void Main::CreateMainMenu(bool isClient) {
@@ -158,15 +162,19 @@ void Main::CreateGameScene(bool isClient) {
     if (isClient) {
         // TODO: load client stuff
     } else {
-        // TODO: load server stuff
+        Player* newPlayer = CreateCharacter();
+        serverObjects_[NULL] = newPlayer;
+        clientObjectID_ = newPlayer->pNode->GetID();
+        printf("Client ID : %i \n", clientObjectID_);
     }
 }
-void Main::CreateCharacter(VariantMap& identity) {
+Player* Main::CreateCharacter() {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
 
-    Player p;
-    p.Initialise(cache, scene_, identity);
-    playerList.Push(p);
+    Player* p = new Player();
+    p->Initialise(cache, scene_);
+
+    return p;
 }
 
 void Main::HandlePhysicsPreStep(StringHash eventType, VariantMap& eventData) {
@@ -197,15 +205,29 @@ void Main::HandleClientConnected(StringHash eventType, VariantMap& eventData) {
     using namespace ClientConnected;
 
     Connection* newConnection = static_cast<Connection*>(eventData[P_CONNECTION].GetPtr());
-
     newConnection->SetScene(scene_);
-
-    CreateCharacter(newConnection->GetIdentity());
 }
 void Main::HandleClientDisconnected(StringHash eventType, VariantMap& eventData) {
     // TODO: Implement HandleClientDisconnected
     printf("HandleClientDisconnected");
     // remove from player list by identity
+}
+
+void Main::HandleServerToClientObjectID(StringHash eventType, VariantMap& eventData) {
+    clientObjectID_ = eventData[PLAYER_ID].GetUInt();
+    printf("Client ID : %i \n", clientObjectID_);
+
+}
+void Main::HandleClientToServerReadyToStart(StringHash eventType, VariantMap& eventData) {
+    using namespace ClientConnected;
+    Connection* newConnection = static_cast<Connection*>(eventData[P_CONNECTION]. GetPtr());
+
+    Player* newPlayer = CreateCharacter();
+    serverObjects_[newConnection] = newPlayer;
+
+    VariantMap remoteEventData;
+    remoteEventData[PLAYER_ID] = newPlayer->pNode->GetID();
+    newConnection-> SendRemoteEvent (E_CLIENTOBJECTAUTHORITY, true, remoteEventData);
 }
 
 void Main::HandleConnect(StringHash eventType, VariantMap& eventData) {
@@ -214,12 +236,24 @@ void Main::HandleConnect(StringHash eventType, VariantMap& eventData) {
     Network* network = GetSubsystem<Network>();
     String address = serverAddress->GetText().Trimmed();
     network->Connect((address.Empty()) ? "localhost" : address, SERVER_PORT, scene_);
+    HandleClientStartGame(eventType, eventData);
 
     menuVisible_ = false;
 }
 void Main::HandleDisconnect(StringHash eventType, VariantMap& eventData) {
-    // TODO: Implement HandleDisconnect
     printf("HandleDisconnect");
+
+    Network* network = GetSubsystem<Network>();
+    Connection* serverConnection = network->GetServerConnection();
+
+    if (serverConnection) {
+        serverConnection->Disconnect();
+        scene_->Clear(true, false);
+        clientObjectID_ = 0;
+    } else if (network->IsServerRunning()) {
+        network->StopServer();
+        scene_->Clear(true, false);
+    }
 }
 void Main::HandleStartServer(StringHash eventType, VariantMap& eventData) {
     Network* network = GetSubsystem<Network>();
@@ -227,6 +261,18 @@ void Main::HandleStartServer(StringHash eventType, VariantMap& eventData) {
 
     menuVisible_ = false;
     CreateGameScene(false);
+}
+void Main::HandleClientStartGame(StringHash eventType, VariantMap & eventData) {
+    if (clientObjectID_ == 0) {
+        Network* network = GetSubsystem<Network>();
+        Connection* serverConnection = network->GetServerConnection();
+
+        if (serverConnection) {
+            VariantMap remoteEventData;
+            remoteEventData[PLAYER_ID] = 0;
+            serverConnection->SendRemoteEvent(E_CLIENTISREADY, true, remoteEventData);
+        }
+    }
 }
 void Main::HandleQuit(StringHash eventType, VariantMap& eventData) {
     engine_->Exit();
@@ -247,18 +293,13 @@ void Main::ClientPrePhysics(float timeStep) {
 void Main::ServerUpdate(float timeStep) {
     // TODO: Make local camera follow server player
     // Boids will update here and should be synced
+    ClientUpdate(timeStep);
 }
 void Main::ClientUpdate(float timeStep) {
-    // printf("%d ", playerList.Size());
-    //
-    // if (playerIndex >= 0 && playerIndex < playerList.Size()) {
-    //     printf("%d", playerList[playerIndex].pNode->GetPosition().x_);
-    //     printf(" ");
-    //     printf("%d", playerList[playerIndex].pNode->GetPosition().z_);
-    //     printf("\n");
-    //
-    //     cameraNode_->SetPosition(playerList[playerIndex].pNode->GetPosition());
-    // }
+    if (clientObjectID_ > 0) {
+        Node* playerNode = this->scene_->GetNode(clientObjectID_);
+        if (playerNode) cameraNode_->SetPosition(playerNode->GetPosition() + cameraNode_->GetRotation() * Vector3::BACK * 10.0);
+    }
 }
 
 Controls Main::ClientToServerControls() {
@@ -280,25 +321,25 @@ void Main::ProcessClientControls() {
 
     for (unsigned i = 0; i < connections.Size(); ++i) {
         Connection* connection = connections[i];
+        Player* playerObject = serverObjects_[connection];
 
-        for (Vector<Player>::Iterator p = playerList.Begin(); p != playerList.End(); p++) {
-            if (p->identity == connection->GetIdentity() && p->pNode != NULL) {
-                p->ApplyControls(connection->GetControls());
-                // send camera position here
-                VariantMap cameraPos;
-                cameraPos["positionX"] = p->pNode->GetPosition().x_;
-                cameraPos["positionY"] = p->pNode->GetPosition().y_;
-                cameraPos["positionZ"] = p->pNode->GetPosition().z_;
+        if (!playerObject) continue;
 
-                connection->SendRemoteEvent(E_CLIENTCAMERAPOSITION, true, cameraPos);
-            }
-        }
+        RigidBody* body = playerObject->pRigidBody;
+        // Get the last controls sent by the client
+        const Controls& controls = connection->GetControls();
+        // Torque is relative to the forward vector
+        Quaternion rotation(0.0f, controls.yaw_, 0.0f);
+        const float MOVE_TORQUE = 5.0f;
+        if (controls.buttons_ & CTRL_FORWARD)
+        body->ApplyTorque(rotation * Vector3::RIGHT * MOVE_TORQUE);
+        if (controls.buttons_ & CTRL_BACK)
+        body->ApplyTorque(rotation * Vector3::LEFT * MOVE_TORQUE);
+        if (controls.buttons_ & CTRL_LEFT)
+        body->ApplyTorque(rotation * Vector3::FORWARD * MOVE_TORQUE);
+        if (controls.buttons_ & CTRL_RIGHT)
+        body->ApplyTorque(rotation * Vector3::BACK * MOVE_TORQUE);
+
+        // TODO: Implement control response
     }
-}
-
-void Main::GetClientCameraPosition(StringHash eventType, VariantMap& eventData) {
-    // move camera here
-    // printf("%d ", eventData["positionX"].GetDouble());
-
-    printf("camera moved to %f %f %f \n", eventData["positionX"].GetDouble(), eventData["positionY"].GetDouble(), eventData["positionZ"].GetDouble());
 }
