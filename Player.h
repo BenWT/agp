@@ -42,9 +42,10 @@ public:
     StaticModel* pObject;
     RigidBody* pRigidBody;
     CollisionShape* pCollisionShape;
+    float pitch = 0.0f, yaw = 0.0f;
 
     // Methods
     Player();
     void Initialise(ResourceCache *pRes, Scene *pScene);
-    void ApplyControls(const Controls& controls);
+    void ApplyControls(const Controls& controls, float timeStep);
 };

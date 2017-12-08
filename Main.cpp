@@ -67,7 +67,7 @@ void Main::Start() {
     Sample::Start();
     CreateMainMenu(false);
 
-    OpenConsoleWindow();
+    // OpenConsoleWindow();
 }
 void Main::SubscribeToEvents() {
     SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(Main, HandleUpdate));
@@ -160,12 +160,9 @@ void Main::CreateGameScene(bool isClient) {
     GetSubsystem<Renderer>()->SetViewport(0, new Viewport(context_, scene_, camera));
 
     if (isClient) {
-        // TODO: load client stuff
+        // Load client stuff here
     } else {
-        Player* newPlayer = CreateCharacter();
-        serverObjects_[NULL] = newPlayer;
-        clientObjectID_ = newPlayer->pNode->GetID();
-        printf("Client ID : %i \n", clientObjectID_);
+        // Load server stuff here
     }
 }
 Player* Main::CreateCharacter() {
@@ -279,7 +276,7 @@ void Main::HandleQuit(StringHash eventType, VariantMap& eventData) {
 }
 
 void Main::ServerPrePhysics(float timeStep) {
-    ProcessClientControls();
+    ProcessClientControls(timeStep);
 }
 void Main::ClientPrePhysics(float timeStep) {
     Network* network = GetSubsystem<Network>();
@@ -291,14 +288,16 @@ void Main::ClientPrePhysics(float timeStep) {
     }
 }
 void Main::ServerUpdate(float timeStep) {
-    // TODO: Make local camera follow server player
     // Boids will update here and should be synced
-    ClientUpdate(timeStep);
 }
 void Main::ClientUpdate(float timeStep) {
     if (clientObjectID_ > 0) {
         Node* playerNode = this->scene_->GetNode(clientObjectID_);
-        if (playerNode) cameraNode_->SetPosition(playerNode->GetPosition() + cameraNode_->GetRotation() * Vector3::BACK * 10.0);
+
+        if (playerNode) {
+            cameraNode_->SetPosition(playerNode->GetPosition() + playerNode->GetRotation() * Vector3::BACK * 10.0);
+            cameraNode_->LookAt(playerNode->GetPosition());
+        }
     }
 }
 
@@ -311,11 +310,12 @@ Controls Main::ClientToServerControls() {
     controls.Set(CTRL_LEFT, input->GetKeyDown(KEY_A));
     controls.Set(CTRL_RIGHT, input->GetKeyDown(KEY_D));
 
-    controls.yaw_ = yaw_;
+    controls.yaw_ = input->GetMouseMove().x_;
+    controls.pitch_ = input->GetMouseMove().y_;
 
     return controls;
 }
-void Main::ProcessClientControls() {
+void Main::ProcessClientControls(float timeStep) {
     Network* network = GetSubsystem<Network>();
     const Vector<SharedPtr<Connection> >& connections = network->GetClientConnections();
 
@@ -324,22 +324,6 @@ void Main::ProcessClientControls() {
         Player* playerObject = serverObjects_[connection];
 
         if (!playerObject) continue;
-
-        RigidBody* body = playerObject->pRigidBody;
-        // Get the last controls sent by the client
-        const Controls& controls = connection->GetControls();
-        // Torque is relative to the forward vector
-        Quaternion rotation(0.0f, controls.yaw_, 0.0f);
-        const float MOVE_TORQUE = 5.0f;
-        if (controls.buttons_ & CTRL_FORWARD)
-        body->ApplyTorque(rotation * Vector3::RIGHT * MOVE_TORQUE);
-        if (controls.buttons_ & CTRL_BACK)
-        body->ApplyTorque(rotation * Vector3::LEFT * MOVE_TORQUE);
-        if (controls.buttons_ & CTRL_LEFT)
-        body->ApplyTorque(rotation * Vector3::FORWARD * MOVE_TORQUE);
-        if (controls.buttons_ & CTRL_RIGHT)
-        body->ApplyTorque(rotation * Vector3::BACK * MOVE_TORQUE);
-
-        // TODO: Implement control response
+        playerObject->ApplyControls(connection->GetControls(), timeStep);
     }
 }

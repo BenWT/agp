@@ -60,5 +60,5 @@ private:
     void ClientUpdate(float timeStep);
 
     Controls ClientToServerControls();
-    void ProcessClientControls();
+    void ProcessClientControls(float timeStep);
 };
