@@ -12,7 +12,7 @@ void Player::Initialise(ResourceCache *pRes, Scene *pScene) {
     pNode->SetPosition(Vector3(Random(40.0f) - 20.0f, 15.0f, Random(40.0f) - 20.0f));
 
     pObject = pNode->CreateComponent<StaticModel>();
-    pObject->SetModel(pRes->GetResource<Model>("Models/Box.mdl"));
+    pObject->SetModel(pRes->GetResource<Model>("Models/Sphere.mdl"));
     pObject->SetMaterial(pRes->GetResource<Material>("Materials/Stone.xml"));
     pObject->SetCastShadows(true);
 
@@ -20,6 +20,7 @@ void Player::Initialise(ResourceCache *pRes, Scene *pScene) {
     pRigidBody->SetUseGravity(false);
     pRigidBody->SetMass(15.0f);
     pRigidBody->SetCollisionLayer(1);
+    pRigidBody->SetAngularFactor(Vector3::ZERO);
 
     pCollisionShape = pNode->CreateComponent<CollisionShape>();
     pCollisionShape->SetTriangleMesh(pObject->GetModel(), 0);
@@ -30,6 +31,9 @@ void Player::Initialise(ResourceCache *pRes, Scene *pScene) {
 void Player::ApplyControls(const Controls& controls, float timeStep) {
     const float MOVE_SPEED = 5.0f;
     const float MOUSE_SENSITIVITY = 1.1f;
+
+    printf("%f \n", pitch);
+    printf("%f \n", yaw);
 
     yaw += controls.yaw_ * MOUSE_SENSITIVITY;
     pitch += controls.pitch_ * MOUSE_SENSITIVITY;
@@ -42,15 +46,12 @@ void Player::ApplyControls(const Controls& controls, float timeStep) {
 
     Vector3 movement;
 
-    // if (controls.buttons_ & CTRL_FORWARD) pNode->Translate(Vector3::FORWARD * MOVE_SPEED * timeStep);
-    // if (controls.buttons_ & CTRL_BACK) pNode->Translate(Vector3::BACK * MOVE_SPEED * timeStep);
-    // if (controls.buttons_ & CTRL_LEFT) pNode->Translate(Vector3::LEFT * MOVE_SPEED * timeStep);
-    // if (controls.buttons_ & CTRL_RIGHT) pNode->Translate(Vector3::RIGHT * MOVE_SPEED * timeStep);
+    if (controls.buttons_ & CTRL_FORWARD) movement += Vector3::FORWARD;
+    if (controls.buttons_ & CTRL_BACK) movement += Vector3::BACK;
+    if (controls.buttons_ & CTRL_LEFT) movement += Vector3::LEFT;
+    if (controls.buttons_ & CTRL_RIGHT) movement += Vector3::RIGHT;
 
-    if (controls.buttons_ & CTRL_FORWARD) movement += Vector3::FORWARD * MOVE_SPEED;
-    if (controls.buttons_ & CTRL_BACK) movement += Vector3::BACK * MOVE_SPEED;
-    if (controls.buttons_ & CTRL_LEFT) movement += Vector3::LEFT * MOVE_SPEED;
-    if (controls.buttons_ & CTRL_RIGHT) movement += Vector3::RIGHT * MOVE_SPEED;
+    movement *= MOVE_SPEED;
 
     pRigidBody->SetLinearVelocity(pRigidBody->GetRotation() * movement);
 }

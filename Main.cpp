@@ -32,12 +32,15 @@
 #include <Urho3D/UI/Window.h>
 
 #include "Main.h"
+#include "Boids.h"
 
 static const StringHash E_CLIENTOBJECTAUTHORITY("ClientObjectAuthority");
 static const StringHash PLAYER_ID("IDENTITY");
 static const StringHash E_CLIENTISREADY("ClientReadyToStart");
 
 URHO3D_DEFINE_APPLICATION_MAIN(Main)
+
+BoidSet boids;
 
 Button* CreateButton(const String& text, int pHeight, Font* font, Urho3D::Window* window) {
     Button* button = window->CreateChild<Button>();
@@ -162,6 +165,7 @@ void Main::CreateGameScene(bool isClient) {
     if (isClient) {
         // Load client stuff here
     } else {
+        boids.Initialise(cache, scene_);
         // Load server stuff here
     }
 }
@@ -277,6 +281,7 @@ void Main::HandleQuit(StringHash eventType, VariantMap& eventData) {
 
 void Main::ServerPrePhysics(float timeStep) {
     ProcessClientControls(timeStep);
+    boids.Update(timeStep);
 }
 void Main::ClientPrePhysics(float timeStep) {
     Network* network = GetSubsystem<Network>();
