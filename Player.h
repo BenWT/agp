@@ -43,9 +43,12 @@ public:
     RigidBody* pRigidBody;
     CollisionShape* pCollisionShape;
     float pitch = 0.0f, yaw = 0.0f;
+    int score = 0;
+    bool isReady = false;
 
     // Methods
     Player();
     void Initialise(ResourceCache *pRes, Scene *pScene);
     void ApplyControls(const Controls& controls, float timeStep);
+    void ResetScore() { score = 0; }
 };

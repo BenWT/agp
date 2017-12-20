@@ -34,12 +34,16 @@
 #include "Main.h"
 #include "Boids.h"
 
-static const StringHash E_CLIENTOBJECTAUTHORITY("ClientObjectAuthority");
 static const StringHash PLAYER_ID("IDENTITY");
+static const StringHash PLAYER_SCORE("SCORE");
+static const StringHash E_CLIENTOBJECTAUTHORITY("ClientObjectAuthority");
 static const StringHash E_CLIENTISREADY("ClientReadyToStart");
+static const StringHash E_CLIENTSCORECHANGE("ClientScoreIncrease");
 
 URHO3D_DEFINE_APPLICATION_MAIN(Main)
 
+Text* fpsCounter;
+Text* scoreCounter;
 BoidSet boids;
 
 Button* CreateButton(const String& text, int pHeight, Font* font, Urho3D::Window* window) {
@@ -52,6 +56,14 @@ Button* CreateButton(const String& text, int pHeight, Font* font, Urho3D::Window
     buttonText->SetText(text);
     window->AddChild(button);
     return button;
+}
+Text* CreateText(const String& text, int pHeight, Font* font, Urho3D::Window* window) {
+    Text* textView = window->CreateChild<Text>();
+    textView->SetFont(font, 12);
+    textView->SetAlignment(HA_CENTER, VA_CENTER);
+    textView->SetText(text);
+    window->AddChild(textView);
+    return textView;
 }
 LineEdit* CreateLineEdit(const String& text, int pHeight, Urho3D::Window* window) {
     LineEdit* lineEdit = window->CreateChild<LineEdit>();
@@ -74,7 +86,6 @@ void Main::Start() {
 }
 void Main::SubscribeToEvents() {
     SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(Main, HandleUpdate));
-    SubscribeToEvent(E_POSTUPDATE, URHO3D_HANDLER(Main, HandlePostUpdate));
     SubscribeToEvent(E_PHYSICSPRESTEP, URHO3D_HANDLER(Main, HandlePhysicsPreStep));
     SubscribeToEvent(E_CLIENTCONNECTED, URHO3D_HANDLER(Main, HandleClientConnected));
     SubscribeToEvent(E_CLIENTDISCONNECTED, URHO3D_HANDLER(Main, HandleClientDisconnected));
@@ -83,6 +94,8 @@ void Main::SubscribeToEvents() {
     GetSubsystem<Network>()->RegisterRemoteEvent(E_CLIENTISREADY);
     SubscribeToEvent(E_CLIENTOBJECTAUTHORITY, URHO3D_HANDLER(Main, HandleServerToClientObjectID));
     GetSubsystem<Network>()->RegisterRemoteEvent(E_CLIENTOBJECTAUTHORITY);
+    SubscribeToEvent(E_CLIENTSCORECHANGE, URHO3D_HANDLER(Main, HandleServerToClientScoreIncreased));
+    GetSubsystem<Network>()->RegisterRemoteEvent(E_CLIENTSCORECHANGE);
 }
 
 void Main::CreateMainMenu(bool isClient) {
@@ -100,7 +113,6 @@ void Main::CreateMainMenu(bool isClient) {
 
     window_ = new Window(context_);
     root->AddChild(window_);
-
     window_->SetMinWidth(300);
     window_->SetLayout(LM_VERTICAL, 6, IntRect(6, 6, 6, 6));
     window_->SetAlignment(HA_CENTER, VA_CENTER);
@@ -113,10 +125,44 @@ void Main::CreateMainMenu(bool isClient) {
     Button* startButton = CreateButton("Start Server", 24, font, window_);
     Button* quitButton = CreateButton("Quit", 24, font, window_);
 
+    fps_ = new Window(context_);
+    root->AddChild(fps_);
+    fps_->SetMinWidth(100);
+    fps_->SetLayout(LM_VERTICAL, 6, IntRect(6, 6, 6, 6));
+    fps_->SetAlignment(HA_LEFT, VA_TOP);
+    fps_->SetName("Window");
+    fps_->SetStyleAuto();
+
+    fpsCounter = CreateText("FPS: 0", 24, font, fps_);
+
+    ready_ = new Window(context_);
+    root->AddChild(ready_);
+    ready_->SetMinWidth(300);
+    ready_->SetLayout(LM_VERTICAL, 6, IntRect(6, 6, 6, 6));
+    ready_->SetAlignment(HA_CENTER, VA_CENTER);
+    ready_->SetName("Window");
+    ready_->SetStyleAuto();
+    ready_->SetVisible(false);
+
+    Text* readyMessage = CreateText("Press Ready...", 24, font, ready_);
+    Button* readyButton = CreateButton("Ready", 24, font, ready_);
+
+    hud_ = new Window(context_);
+    root->AddChild(hud_);
+    hud_->SetMinWidth(500);
+    hud_->SetLayout(LM_VERTICAL, 6, IntRect(6, 6, 6, 6));
+    hud_->SetAlignment(HA_RIGHT, VA_TOP);
+    hud_->SetName("Window");
+    hud_->SetStyleAuto();
+    hud_->SetVisible(false);
+
+    scoreCounter = CreateText("Score: 0", 24, font, hud_);
+
     SubscribeToEvent(connectButton, E_RELEASED, URHO3D_HANDLER(Main, HandleConnect));
     SubscribeToEvent(disconnectButton, E_RELEASED, URHO3D_HANDLER(Main, HandleDisconnect));
     SubscribeToEvent(startButton, E_RELEASED, URHO3D_HANDLER(Main, HandleStartServer));
     SubscribeToEvent(quitButton, E_RELEASED, URHO3D_HANDLER(Main, HandleQuit));
+    SubscribeToEvent(readyButton, E_RELEASED, URHO3D_HANDLER(Main, HandleClientStartGame));
     SubscribeToEvents();
 }
 void Main::CreateGameScene(bool isClient) {
@@ -160,13 +206,57 @@ void Main::CreateGameScene(bool isClient) {
     CollisionShape* shape = floorNode->CreateComponent<CollisionShape>(LOCAL);
     shape->SetBox(Vector3::ONE);
 
+    Node* wallNode1 = scene_->CreateChild("Wall", LOCAL);
+    wallNode1->SetPosition(Vector3(100.5f, 25.0f, 0.0f));
+    wallNode1->SetScale(Vector3(1.0f, 50.0f, 200.0f));
+    StaticModel* wallObject1 = wallNode1->CreateComponent<StaticModel>(LOCAL);
+    wallObject1->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+    wallObject1->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml"));
+
+    Node* wallNode2 = scene_->CreateChild("Wall", LOCAL);
+    wallNode2->SetPosition(Vector3(-100.5f, 25.0f, 0.0f));
+    wallNode2->SetScale(Vector3(1.0f, 50.0f, 200.0f));
+    StaticModel* wallObject2 = wallNode2->CreateComponent<StaticModel>(LOCAL);
+    wallObject2->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+    wallObject2->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml"));
+
+    Node* wallNode3 = scene_->CreateChild("Wall", LOCAL);
+    wallNode3->SetPosition(Vector3(0.0f, 25.0f, 100.5f));
+    wallNode3->SetScale(Vector3(200.0f, 50.0f, 1.0f));
+    StaticModel* wallObject3 = wallNode3->CreateComponent<StaticModel>(LOCAL);
+    wallObject3->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+    wallObject3->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml"));
+
+    Node* wallNode4 = scene_->CreateChild("Wall", LOCAL);
+    wallNode4->SetPosition(Vector3(0.0f, 25.0f, -100.5f));
+    wallNode4->SetScale(Vector3(200.0f, 50.0f, 1.0f));
+    StaticModel* wallObject4 = wallNode4->CreateComponent<StaticModel>(LOCAL);
+    wallObject4->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+    wallObject4->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml"));
+
+    RigidBody* wallBody1 = wallNode1->CreateComponent<RigidBody>(LOCAL);
+    RigidBody* wallBody2 = wallNode2->CreateComponent<RigidBody>(LOCAL);
+    RigidBody* wallBody3 = wallNode3->CreateComponent<RigidBody>(LOCAL);
+    RigidBody* wallBody4 = wallNode4->CreateComponent<RigidBody>(LOCAL);
+    wallBody1->SetCollisionLayer(2);
+    wallBody2->SetCollisionLayer(2);
+    wallBody3->SetCollisionLayer(2);
+    wallBody4->SetCollisionLayer(2);
+    CollisionShape* wallShape1 = wallNode1->CreateComponent<CollisionShape>(LOCAL);
+    CollisionShape* wallShape2 = wallNode2->CreateComponent<CollisionShape>(LOCAL);
+    CollisionShape* wallShape3 = wallNode3->CreateComponent<CollisionShape>(LOCAL);
+    CollisionShape* wallShape4 = wallNode4->CreateComponent<CollisionShape>(LOCAL);
+    wallShape1->SetBox(Vector3::ONE);
+    wallShape2->SetBox(Vector3::ONE);
+    wallShape3->SetBox(Vector3::ONE);
+    wallShape4->SetBox(Vector3::ONE);
+
     GetSubsystem<Renderer>()->SetViewport(0, new Viewport(context_, scene_, camera));
 
     if (isClient) {
-        // Load client stuff here
+        // Load Client Stuff
     } else {
         boids.Initialise(cache, scene_);
-        // Load server stuff here
     }
 }
 Player* Main::CreateCharacter() {
@@ -196,12 +286,6 @@ void Main::HandleUpdate(StringHash eventType, VariantMap& eventData) {
     if (serverConnection) ClientUpdate(eventData[P_TIMESTEP].GetFloat());
     else if (network->IsServerRunning()) ServerUpdate(eventData[P_TIMESTEP].GetFloat());
 }
-void Main::HandlePostUpdate(StringHash eventType, VariantMap& eventData) {
-    UI* ui = GetSubsystem<UI>();
-    Input* input = GetSubsystem<Input>();
-    ui->GetCursor()->SetVisible(menuVisible_);
-    window_->SetVisible(menuVisible_);
-}
 void Main::HandleClientConnected(StringHash eventType, VariantMap& eventData) {
     using namespace ClientConnected;
 
@@ -216,8 +300,11 @@ void Main::HandleClientDisconnected(StringHash eventType, VariantMap& eventData)
 
 void Main::HandleServerToClientObjectID(StringHash eventType, VariantMap& eventData) {
     clientObjectID_ = eventData[PLAYER_ID].GetUInt();
-    printf("Client ID : %i \n", clientObjectID_);
+    ready_->SetVisible(false);
+    hud_->SetVisible(true);
 
+    UI* ui = GetSubsystem<UI>();
+    ui->GetCursor()->SetVisible(false);
 }
 void Main::HandleClientToServerReadyToStart(StringHash eventType, VariantMap& eventData) {
     using namespace ClientConnected;
@@ -228,7 +315,11 @@ void Main::HandleClientToServerReadyToStart(StringHash eventType, VariantMap& ev
 
     VariantMap remoteEventData;
     remoteEventData[PLAYER_ID] = newPlayer->pNode->GetID();
-    newConnection-> SendRemoteEvent (E_CLIENTOBJECTAUTHORITY, true, remoteEventData);
+    newConnection->SendRemoteEvent (E_CLIENTOBJECTAUTHORITY, true, remoteEventData);
+}
+void Main::HandleServerToClientScoreIncreased(StringHash eventType, VariantMap& eventData) {
+    int score = eventData[PLAYER_SCORE].GetInt();
+    scoreCounter->SetText("Score: " + String(score));
 }
 
 void Main::HandleConnect(StringHash eventType, VariantMap& eventData) {
@@ -237,9 +328,9 @@ void Main::HandleConnect(StringHash eventType, VariantMap& eventData) {
     Network* network = GetSubsystem<Network>();
     String address = serverAddress->GetText().Trimmed();
     network->Connect((address.Empty()) ? "localhost" : address, SERVER_PORT, scene_);
-    HandleClientStartGame(eventType, eventData);
 
-    menuVisible_ = false;
+    window_->SetVisible(false);
+    ready_->SetVisible(true);
 }
 void Main::HandleDisconnect(StringHash eventType, VariantMap& eventData) {
     printf("HandleDisconnect");
@@ -260,7 +351,7 @@ void Main::HandleStartServer(StringHash eventType, VariantMap& eventData) {
     Network* network = GetSubsystem<Network>();
     network->StartServer(SERVER_PORT);
 
-    menuVisible_ = false;
+    window_->SetVisible(false);
     CreateGameScene(false);
 }
 void Main::HandleClientStartGame(StringHash eventType, VariantMap & eventData) {
@@ -281,7 +372,21 @@ void Main::HandleQuit(StringHash eventType, VariantMap& eventData) {
 
 void Main::ServerPrePhysics(float timeStep) {
     ProcessClientControls(timeStep);
-    boids.Update(timeStep);
+
+    Network* network = GetSubsystem<Network>();
+    const Vector<SharedPtr<Connection> >& connections = network->GetClientConnections();
+    Vector<Vector3> playerPositions;
+
+    for (unsigned i = 0; i < connections.Size(); ++i) {
+        Connection* connection = connections[i];
+        Player* playerObject = serverObjects_[connection];
+
+        if (!playerObject || playerObject->pNode == NULL) continue;
+
+        playerPositions.Push(serverObjects_[connection]->pRigidBody->GetPosition());
+    }
+
+    boids.Update(timeStep, playerPositions);
 }
 void Main::ClientPrePhysics(float timeStep) {
     Network* network = GetSubsystem<Network>();
@@ -293,7 +398,9 @@ void Main::ClientPrePhysics(float timeStep) {
     }
 }
 void Main::ServerUpdate(float timeStep) {
-    // Boids will update here and should be synced
+    FrameInfo frameInfo = GetSubsystem<Renderer>()->GetFrameInfo();
+    // fpsCounter->SetText("FPS: " + String((int)(1.0 / frameInfo.timeStep_)));
+    fpsCounter->SetText("FPS: " + String((int)(1.0 / timeStep)));
 }
 void Main::ClientUpdate(float timeStep) {
     if (clientObjectID_ > 0) {
@@ -304,6 +411,9 @@ void Main::ClientUpdate(float timeStep) {
             cameraNode_->LookAt(playerNode->GetPosition());
         }
     }
+
+    FrameInfo frameInfo = GetSubsystem<Renderer>()->GetFrameInfo();
+    fpsCounter->SetText("FPS: " + String((int)(1.0 / frameInfo.timeStep_)));
 }
 
 Controls Main::ClientToServerControls() {
@@ -330,5 +440,23 @@ void Main::ProcessClientControls(float timeStep) {
 
         if (!playerObject) continue;
         playerObject->ApplyControls(connection->GetControls(), timeStep);
+
+        Ray cameraRay(playerObject->pNode->GetPosition(), playerObject->pNode->GetPosition() + playerObject->pNode->GetRotation() * Vector3::FORWARD * 100.0);
+        PhysicsRaycastResult result;
+        scene_->GetComponent<PhysicsWorld>()->SphereCast (result, cameraRay, 2.0, 5.0, 2);
+        if (result.body_) {
+            Component* component = result.body_->GetComponent("StaticModel");
+            Node* node = component->GetNode();
+
+            if (node->GetName() == "BoidBig" || node->GetName() == "BoidSmall") {
+                if (node->GetName() == "BoidBig") playerObject->score += 5;
+                else if (node->GetName() == "BoidSmall") playerObject->score += 10;
+
+                node->SetEnabled(false);
+                VariantMap remoteEventData;
+                remoteEventData[PLAYER_SCORE] = playerObject->score;
+                connection->SendRemoteEvent (E_CLIENTSCORECHANGE, true, remoteEventData);
+            }
+        }
     }
 }

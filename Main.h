@@ -18,7 +18,7 @@ public:
 
     static const unsigned short SERVER_PORT = 2345;
     LineEdit* serverAddress;
-    SharedPtr<Window> window_;
+    SharedPtr<Window> window_, fps_, ready_, hud_;
 
     unsigned clientObjectID_ = 0;
     HashMap<Connection*, Player*> serverObjects_;
@@ -45,6 +45,7 @@ private:
     // Custom Network Events
     void HandleServerToClientObjectID(StringHash eventType, VariantMap& eventData);
     void HandleClientToServerReadyToStart(StringHash eventType, VariantMap& eventData);
+    void HandleServerToClientScoreIncreased(StringHash eventType, VariantMap& eventData);
 
     // Menu Events
     void HandleConnect(StringHash eventType, VariantMap& eventData);

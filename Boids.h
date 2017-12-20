@@ -19,6 +19,9 @@
 #include <Urho3D/Physics/RigidBody.h>
 #include <Urho3D/Resource/ResourceCache.h>
 #include <Urho3D/Scene/Scene.h>
+
+#include "Player.h"
+
 namespace Urho3D
 {
     class Node;
@@ -30,36 +33,43 @@ namespace Urho3D
 // All Urho3D classes reside in namespace Urho3D
 using namespace Urho3D;
 
-const static int NumBoids = 100;
+const static int GridSize = 20;
+const static int NumSmall = 375;
+const static int NumMedium = 375;
+const static int NumBoids = NumSmall + NumMedium;
 
 class Boid {
-    static float rs; // Separation Range
-    static float cs; // Seperation Factor
-    static float rc; // Cohesion Range
-    static float cc; // Cohesion Factor
-    static float ra; // Alignment Range
-    static float ca; // Alignment Factor
-    static float vmax; // Maximum Velocity
+    static float separationRange; // Separation Range
+    static float separationFactor; // Seperation Factor
+    static float cohesionRange; // Cohesion Range
+    static float cohesionFactor; // Cohesion Factor
+    static float alignmentRange; // Alignment Range
+    static float alignmentFactor; // Alignment Factor
+    static float velocityMax; // Maximum Velocity
 
 public:
     Vector3 force;
     Node* pNode;
     StaticModel* pObject;
     RigidBody* pRigidBody;
-    CollisionShape* pCollisionShape;;
+    CollisionShape* pCollisionShape;
+    bool isBig;
+    int gridX, gridZ;
 
     // Methods
     Boid();
-    void Initialise(ResourceCache *pRes, Scene *pScene);
+    void Initialise(ResourceCache *pRes, Scene *pScene, bool isBig);
     void Update(float tm);
-    void ComputeForce(Boid *b);
+    void ComputeForce(Boid *b, Vector<Vector3> playerPositions, Vector<int> neighbours);
 };
 
 class BoidSet {
 public:
     Boid boidList[NumBoids];
+    Vector<Vector<Vector<int>>> boidGrid;
 
     BoidSet() {};
     void Initialise(ResourceCache *pRes, Scene *pScene);
-    void Update(float tm);
+    void Update(float tm, Vector<Vector3> playerPositions);
+    void UpdateGrid();
 };

@@ -22,18 +22,15 @@ void Player::Initialise(ResourceCache *pRes, Scene *pScene) {
     pRigidBody->SetCollisionLayer(1);
     pRigidBody->SetAngularFactor(Vector3::ZERO);
 
-    pCollisionShape = pNode->CreateComponent<CollisionShape>();
-    pCollisionShape->SetTriangleMesh(pObject->GetModel(), 0);
+    // pCollisionShape = pNode->CreateComponent<CollisionShape>();
+    // pCollisionShape->SetTriangleMesh(pObject->GetModel(), 0);
 
     pNode->SetEnabled(true);
 }
 
 void Player::ApplyControls(const Controls& controls, float timeStep) {
-    const float MOVE_SPEED = 5.0f;
+    const float MOVE_SPEED = 15.0f;
     const float MOUSE_SENSITIVITY = 1.1f;
-
-    printf("%f \n", pitch);
-    printf("%f \n", yaw);
 
     yaw += controls.yaw_ * MOUSE_SENSITIVITY;
     pitch += controls.pitch_ * MOUSE_SENSITIVITY;
