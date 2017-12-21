@@ -13,8 +13,9 @@ void Player::Initialise(ResourceCache *pRes, Scene *pScene) {
 
     pObject = pNode->CreateComponent<StaticModel>();
     pObject->SetModel(pRes->GetResource<Model>("Models/Sphere.mdl"));
-    pObject->SetMaterial(pRes->GetResource<Material>("Materials/Stone.xml"));
+    pObject->SetMaterial(pRes->GetResource<Material>("Materials/Green-scales.xml"));
     pObject->SetCastShadows(true);
+    pNode->SetScale(2.0);
 
     pRigidBody = pNode->CreateComponent<RigidBody>();
     pRigidBody->SetUseGravity(false);

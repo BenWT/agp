@@ -39,13 +39,13 @@ void Boid::Initialise(ResourceCache *pRes, Scene *pScene, bool isBig) {
 
     if (isBig) {
         pObject->SetModel(pRes->GetResource<Model>("Models/Cone.mdl"));
-        pNode->SetScale(1.5);
+        pNode->SetScale(1.0);
     } else {
         pObject->SetModel(pRes->GetResource<Model>("Models/Box.mdl"));
         pNode->SetScale(1.0);
     }
 
-    pObject->SetMaterial(pRes->GetResource<Material>("Materials/Stone.xml"));
+    pObject->SetMaterial(pRes->GetResource<Material>("Materials/Red-Scales.xml"));
     pObject->SetCastShadows(true);
 
     pRigidBody = pNode->CreateComponent<RigidBody>();
@@ -54,8 +54,8 @@ void Boid::Initialise(ResourceCache *pRes, Scene *pScene, bool isBig) {
     pRigidBody->SetCollisionLayer(2);
 
     pCollisionShape = pNode->CreateComponent<CollisionShape>();
-    pCollisionShape->SetTriangleMesh(pObject->GetModel(), 0);
-    // pCollisionShape->SetBox(pNode->GetScale()); // TODO: change for optimisation tests
+    // pCollisionShape->SetTriangleMesh(pObject->GetModel(), 0);
+    pCollisionShape->SetBox(pNode->GetScale()); // TODO: change for optimisation tests
 }
 void Boid::ComputeForce(Boid *pBoidList, Vector<Vector3> playerPositions, Vector<int> neighbours) {
     force = Vector3(0,0,0); // Reset total force

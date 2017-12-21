@@ -179,9 +179,9 @@ void Main::CreateGameScene(bool isClient) {
 
     Node* zoneNode = scene_->CreateChild("Zone", LOCAL);
     Zone* zone = zoneNode->CreateComponent<Zone>(LOCAL);
-    zone->SetAmbientColor(Color(0.15f, 0.15f, 0.15f));
-    zone->SetFogColor(Color(0.5f, 0.5f, 0.7f));
-    zone->SetFogStart(100.0f);
+    zone->SetAmbientColor(Color(0.15f, 0.15f, 0.55f));
+    zone->SetFogColor(Color(0.5f, 0.5f, 0.95f));
+    zone->SetFogStart(20.0f);
     zone->SetFogEnd(300.0f);
     zone->SetBoundingBox(BoundingBox(-1000.0f, 1000.0f));
 
@@ -407,8 +407,9 @@ void Main::ClientUpdate(float timeStep) {
         Node* playerNode = this->scene_->GetNode(clientObjectID_);
 
         if (playerNode) {
-            cameraNode_->SetPosition(playerNode->GetPosition() + playerNode->GetRotation() * Vector3::BACK * 10.0);
+            cameraNode_->SetPosition(playerNode->GetPosition() + playerNode->GetRotation() * Vector3::BACK * 25.0);
             cameraNode_->LookAt(playerNode->GetPosition());
+            cameraNode_->SetPosition(cameraNode_->GetPosition() + playerNode->GetRotation() * Vector3::UP * 2.0);
         }
     }
 
