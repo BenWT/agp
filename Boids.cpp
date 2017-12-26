@@ -54,8 +54,7 @@ void Boid::Initialise(ResourceCache *pRes, Scene *pScene, bool isBig) {
     pRigidBody->SetCollisionLayer(2);
 
     pCollisionShape = pNode->CreateComponent<CollisionShape>();
-    // pCollisionShape->SetTriangleMesh(pObject->GetModel(), 0);
-    pCollisionShape->SetBox(pNode->GetScale()); // TODO: change for optimisation tests
+    pCollisionShape->SetBox(pNode->GetScale());
 }
 void Boid::ComputeForce(Boid *pBoidList, Vector<Vector3> playerPositions, Vector<int> neighbours) {
     force = Vector3(0,0,0); // Reset total force

@@ -8,6 +8,8 @@
 #include <Urho3D/Graphics/Light.h>
 #include <Urho3D/Graphics/Material.h>
 #include <Urho3D/Graphics/Octree.h>
+#include <Urho3D/Graphics/ParticleEffect.h>
+#include <Urho3D/Graphics/ParticleEmitter.h>
 #include <Urho3D/Graphics/Renderer.h>
 #include <Urho3D/Graphics/Zone.h>
 #include <Urho3D/Input/Controls.h>
@@ -80,15 +82,15 @@ Main::~Main() {}
 
 void Main::Start() {
     Sample::Start();
-    CreateMainMenu(false);
-
-    // OpenConsoleWindow();
+    CreateMainMenu();
 }
 void Main::SubscribeToEvents() {
     SubscribeToEvent(E_UPDATE, URHO3D_HANDLER(Main, HandleUpdate));
     SubscribeToEvent(E_PHYSICSPRESTEP, URHO3D_HANDLER(Main, HandlePhysicsPreStep));
     SubscribeToEvent(E_CLIENTCONNECTED, URHO3D_HANDLER(Main, HandleClientConnected));
     SubscribeToEvent(E_CLIENTDISCONNECTED, URHO3D_HANDLER(Main, HandleClientDisconnected));
+
+    SubscribeToEvent(E_SERVERDISCONNECTED, URHO3D_HANDLER(Main, HandleServerDisconnected));
 
     SubscribeToEvent(E_CLIENTISREADY, URHO3D_HANDLER(Main, HandleClientToServerReadyToStart));
     GetSubsystem<Network>()->RegisterRemoteEvent(E_CLIENTISREADY);
@@ -98,7 +100,7 @@ void Main::SubscribeToEvents() {
     GetSubsystem<Network>()->RegisterRemoteEvent(E_CLIENTSCORECHANGE);
 }
 
-void Main::CreateMainMenu(bool isClient) {
+void Main::CreateMainMenu() {
     Sample::InitMouseMode(MM_RELATIVE);
     ResourceCache* cache = GetSubsystem<ResourceCache>();
     UI* ui = GetSubsystem<UI>();
@@ -164,8 +166,10 @@ void Main::CreateMainMenu(bool isClient) {
     SubscribeToEvent(quitButton, E_RELEASED, URHO3D_HANDLER(Main, HandleQuit));
     SubscribeToEvent(readyButton, E_RELEASED, URHO3D_HANDLER(Main, HandleClientStartGame));
     SubscribeToEvents();
+
+    CreateGameScene();
 }
-void Main::CreateGameScene(bool isClient) {
+void Main::CreateGameScene() {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
 
     scene_ = new Scene(context_);
@@ -253,11 +257,16 @@ void Main::CreateGameScene(bool isClient) {
 
     GetSubsystem<Renderer>()->SetViewport(0, new Viewport(context_, scene_, camera));
 
-    if (isClient) {
-        // Load Client Stuff
-    } else {
-        boids.Initialise(cache, scene_);
-    }
+    // if (isClient) {
+    //     // Load Client Stuff
+    // } else {
+    //     boids.Initialise(cache, scene_);
+    // }
+}
+void Main::CreateClientObjects() {}
+void Main::CreateServerObjects() {
+    ResourceCache* cache = GetSubsystem<ResourceCache>();
+    boids.Initialise(cache, scene_);
 }
 Player* Main::CreateCharacter() {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
@@ -293,9 +302,26 @@ void Main::HandleClientConnected(StringHash eventType, VariantMap& eventData) {
     newConnection->SetScene(scene_);
 }
 void Main::HandleClientDisconnected(StringHash eventType, VariantMap& eventData) {
-    // TODO: Implement HandleClientDisconnected
-    printf("HandleClientDisconnected");
-    // remove from player list by identity
+    using namespace ClientConnected;
+
+    Connection* connection = static_cast<Connection*>(eventData[P_CONNECTION].GetPtr());
+
+    Player* playerObject = serverObjects_[connection];
+    if (playerObject) playerObject->pNode->Remove();
+}
+void Main::HandleServerDisconnected(StringHash eventType, VariantMap& eventData) {
+    printf("HandleServerDisconnected\n");
+
+    scene_->Clear(true, false);
+    clientObjectID_ = 0;
+
+    window_->SetVisible(true);
+    fps_->SetVisible(false);
+    hud_->SetVisible(false);
+
+
+    UI* ui = GetSubsystem<UI>();
+    ui->GetCursor()->SetVisible(true);
 }
 
 void Main::HandleServerToClientObjectID(StringHash eventType, VariantMap& eventData) {
@@ -323,7 +349,7 @@ void Main::HandleServerToClientScoreIncreased(StringHash eventType, VariantMap& 
 }
 
 void Main::HandleConnect(StringHash eventType, VariantMap& eventData) {
-    CreateGameScene(true);
+    CreateClientObjects();
 
     Network* network = GetSubsystem<Network>();
     String address = serverAddress->GetText().Trimmed();
@@ -352,7 +378,8 @@ void Main::HandleStartServer(StringHash eventType, VariantMap& eventData) {
     network->StartServer(SERVER_PORT);
 
     window_->SetVisible(false);
-    CreateGameScene(false);
+
+    CreateServerObjects();
 }
 void Main::HandleClientStartGame(StringHash eventType, VariantMap & eventData) {
     if (clientObjectID_ == 0) {
@@ -440,6 +467,7 @@ void Main::ProcessClientControls(float timeStep) {
         Player* playerObject = serverObjects_[connection];
 
         if (!playerObject) continue;
+
         playerObject->ApplyControls(connection->GetControls(), timeStep);
 
         Ray cameraRay(playerObject->pNode->GetPosition(), playerObject->pNode->GetPosition() + playerObject->pNode->GetRotation() * Vector3::FORWARD * 100.0);
@@ -452,6 +480,14 @@ void Main::ProcessClientControls(float timeStep) {
             if (node->GetName() == "BoidBig" || node->GetName() == "BoidSmall") {
                 if (node->GetName() == "BoidBig") playerObject->score += 5;
                 else if (node->GetName() == "BoidSmall") playerObject->score += 10;
+
+                ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+                ParticleEffect* particleEffect = cache->GetResource<ParticleEffect>("Particle/SnowExplosionBig.xml");
+                Node* particleNode_ = scene_->CreateChild("ParticleEmitter");
+                ParticleEmitter* particleEmitter = particleNode_->CreateComponent<ParticleEmitter>();
+                particleEmitter->SetEffect(particleEffect);
+                particleNode_->SetPosition(node->GetPosition());
 
                 node->SetEnabled(false);
                 VariantMap remoteEventData;

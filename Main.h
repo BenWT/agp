@@ -31,8 +31,10 @@ private:
     void SubscribeToEvents();
 
     // Object Creators
-    void CreateMainMenu(bool isClient);
-    void CreateGameScene(bool isClient);
+    void CreateMainMenu();
+    void CreateGameScene();
+    void CreateClientObjects();
+    void CreateServerObjects();
     Player* CreateCharacter();
 
     // Urho Event Handlers
@@ -41,6 +43,7 @@ private:
     void HandlePhysicsPreStep(StringHash eventType, VariantMap& eventData);
     void HandleClientConnected(StringHash eventType, VariantMap& eventData);
     void HandleClientDisconnected(StringHash eventType, VariantMap& eventData);
+    void HandleServerDisconnected(StringHash eventType, VariantMap& eventData);
 
     // Custom Network Events
     void HandleServerToClientObjectID(StringHash eventType, VariantMap& eventData);

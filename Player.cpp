@@ -23,33 +23,35 @@ void Player::Initialise(ResourceCache *pRes, Scene *pScene) {
     pRigidBody->SetCollisionLayer(1);
     pRigidBody->SetAngularFactor(Vector3::ZERO);
 
-    // pCollisionShape = pNode->CreateComponent<CollisionShape>();
-    // pCollisionShape->SetTriangleMesh(pObject->GetModel(), 0);
+    pCollisionShape = pNode->CreateComponent<CollisionShape>();
+    pCollisionShape->SetBox(pNode->GetScale());
 
     pNode->SetEnabled(true);
 }
 
 void Player::ApplyControls(const Controls& controls, float timeStep) {
-    const float MOVE_SPEED = 15.0f;
-    const float MOUSE_SENSITIVITY = 1.1f;
+    if (pNode) {
+        const float MOVE_SPEED = 25.0f;
+        const float MOUSE_SENSITIVITY = 1.1f;
 
-    yaw += controls.yaw_ * MOUSE_SENSITIVITY;
-    pitch += controls.pitch_ * MOUSE_SENSITIVITY;
+        yaw += controls.yaw_ * MOUSE_SENSITIVITY;
+        pitch += controls.pitch_ * MOUSE_SENSITIVITY;
 
-    if (pitch > 45.0f) pitch = 45.0f;
-    if (pitch < -45.0f) pitch = -45.0f;
+        if (pitch > 45.0f) pitch = 45.0f;
+        if (pitch < -45.0f) pitch = -45.0f;
 
-    Quaternion rotation = Quaternion(pitch, yaw, 0.0f);
-    pRigidBody->SetRotation(rotation);
+        Quaternion rotation = Quaternion(pitch, yaw, 0.0f);
+        pRigidBody->SetRotation(rotation);
 
-    Vector3 movement;
+        Vector3 movement;
 
-    if (controls.buttons_ & CTRL_FORWARD) movement += Vector3::FORWARD;
-    if (controls.buttons_ & CTRL_BACK) movement += Vector3::BACK;
-    if (controls.buttons_ & CTRL_LEFT) movement += Vector3::LEFT;
-    if (controls.buttons_ & CTRL_RIGHT) movement += Vector3::RIGHT;
+        if (controls.buttons_ & CTRL_FORWARD) movement += Vector3::FORWARD;
+        if (controls.buttons_ & CTRL_BACK) movement += Vector3::BACK;
+        if (controls.buttons_ & CTRL_LEFT) movement += Vector3::LEFT;
+        if (controls.buttons_ & CTRL_RIGHT) movement += Vector3::RIGHT;
 
-    movement *= MOVE_SPEED;
+        movement *= MOVE_SPEED;
 
-    pRigidBody->SetLinearVelocity(pRigidBody->GetRotation() * movement);
+        pRigidBody->SetLinearVelocity(pRigidBody->GetRotation() * movement);
+    }
 }
