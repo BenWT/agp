@@ -20,6 +20,9 @@ public:
     LineEdit* serverAddress;
     SharedPtr<Window> window_, fps_, ready_, hud_;
 
+    SharedPtr<Node> waterNode_, reflectionCameraNode_;
+    Plane waterPlane_, waterClipPlane_;
+
     unsigned clientObjectID_ = 0;
     HashMap<Connection*, Player*> serverObjects_;
 

@@ -34,8 +34,8 @@ namespace Urho3D
 using namespace Urho3D;
 
 const static int GridSize = 20;
-const static int NumSmall = 20;
-const static int NumMedium = 20;
+const static int NumSmall = 100;
+const static int NumMedium = 100;
 const static int NumBoids = NumSmall + NumMedium;
 
 class Boid {

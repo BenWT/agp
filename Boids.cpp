@@ -38,10 +38,10 @@ void Boid::Initialise(ResourceCache *pRes, Scene *pScene, bool isBig) {
     pObject = pNode->CreateComponent<StaticModel>();
 
     if (isBig) {
-        pObject->SetModel(pRes->GetResource<Model>("Models/Cone.mdl"));
+        pObject->SetModel(pRes->GetResource<Model>("Models/TropicalFish01.mdl"));
         pNode->SetScale(1.0);
     } else {
-        pObject->SetModel(pRes->GetResource<Model>("Models/Box.mdl"));
+        pObject->SetModel(pRes->GetResource<Model>("Models/TropicalFish01.mdl"));
         pNode->SetScale(1.0);
     }
 
@@ -93,24 +93,6 @@ void Boid::ComputeForce(Boid *pBoidList, Vector<Vector3> playerPositions, Vector
         } else continue;
     }
 
-    // for (int i = 0; i < NumBoids; i++) {
-    //     if (this == &pBoidList[i] || !pNode->IsEnabled() || !pBoidList[i].pNode->IsEnabled()) continue;
-    //
-    //     Vector3 pDelta = pos - pBoidList[i].pRigidBody->GetPosition(); // Get difference in position between boids
-    //
-    //     if (isBig == pBoidList[i].isBig) {
-    //         if (pDelta.Length() < cohesionRange) {
-    //             pMean += pBoidList[i].pRigidBody->GetPosition();
-    //             pN++;
-    //         } if (pDelta.Length() < alignmentRange) {
-    //             vMean += pBoidList[i].pRigidBody->GetLinearVelocity();
-    //             vN++;
-    //         } if (pDelta.Length() < separationRange) {
-    //             fs += (pDelta / pDelta.Length());
-    //         }
-    //     } else continue;
-    // }
-
     // Calculate Cohesion Average
     if (pN > 0) {
         pMean /= pN;
@@ -144,12 +126,16 @@ void Boid::Update(float tm) {
     else if (d > 150.0f) d = 150.0f;
 
     pRigidBody->SetLinearVelocity(vel.Normalized() * d);
-    vel = pRigidBody->GetLinearVelocity();
+    // vel = pRigidBody->GetLinearVelocity();
 
-    Vector3 vn = vel.Normalized();
-    Vector3 cp = -vn.CrossProduct(Vector3(0.0f, 1.0f, 0.0f));
-    float dp = cp.DotProduct(vn);
-    pRigidBody->SetRotation(Quaternion(Acos(dp), cp));
+    // Vector3 vn = vel.Normalized();
+    // Vector3 cp = -vn.CrossProduct(Vector3(0.0f, 1.0f, 0.0f));
+    // float dp = cp.DotProduct(vn);
+    // pRigidBody->SetRotation(Quaternion(Acos(dp), cp));
+
+    // pRigidBody->LookAt(pRigidBody->GetPosition() + vel);
+
+    pRigidBody->SetRotation(Quaternion(0.0, 180 - (90 + atan2(vel.z_, vel.x_) * 180 / 3.14159265), 0.0));
 }
 
 void BoidSet::Initialise(ResourceCache *pRes, Scene *pScene) {

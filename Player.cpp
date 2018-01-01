@@ -12,7 +12,7 @@ void Player::Initialise(ResourceCache *pRes, Scene *pScene) {
     pNode->SetPosition(Vector3(Random(40.0f) - 20.0f, 15.0f, Random(40.0f) - 20.0f));
 
     pObject = pNode->CreateComponent<StaticModel>();
-    pObject->SetModel(pRes->GetResource<Model>("Models/Sphere.mdl"));
+    pObject->SetModel(pRes->GetResource<Model>("Models/Shark.mdl"));
     pObject->SetMaterial(pRes->GetResource<Material>("Materials/Green-scales.xml"));
     pObject->SetCastShadows(true);
     pNode->SetScale(2.0);

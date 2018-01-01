@@ -11,6 +11,7 @@
 #include <Urho3D/Graphics/ParticleEffect.h>
 #include <Urho3D/Graphics/ParticleEmitter.h>
 #include <Urho3D/Graphics/Renderer.h>
+#include <Urho3D/Graphics/Skybox.h>
 #include <Urho3D/Graphics/Zone.h>
 #include <Urho3D/Input/Controls.h>
 #include <Urho3D/Input/Input.h>
@@ -151,7 +152,7 @@ void Main::CreateMainMenu() {
 
     hud_ = new Window(context_);
     root->AddChild(hud_);
-    hud_->SetMinWidth(500);
+    hud_->SetMinWidth(10);
     hud_->SetLayout(LM_VERTICAL, 6, IntRect(6, 6, 6, 6));
     hud_->SetAlignment(HA_RIGHT, VA_TOP);
     hud_->SetName("Window");
@@ -170,6 +171,7 @@ void Main::CreateMainMenu() {
     CreateGameScene();
 }
 void Main::CreateGameScene() {
+    Graphics* graphics = GetSubsystem<Graphics>();
     ResourceCache* cache = GetSubsystem<ResourceCache>();
 
     scene_ = new Scene(context_);
@@ -255,13 +257,50 @@ void Main::CreateGameScene() {
     wallShape3->SetBox(Vector3::ONE);
     wallShape4->SetBox(Vector3::ONE);
 
-    GetSubsystem<Renderer>()->SetViewport(0, new Viewport(context_, scene_, camera));
+    waterNode_ = scene_->CreateChild("Water", LOCAL);
+    waterNode_->SetScale(Vector3(2048.0f, 1.0f, 2048.0f));
+    waterNode_->SetPosition(Vector3(0.0f, 50.0f, 0.0f));
+    waterNode_->SetRotation(Quaternion(180.0f, 0.0, 0.0f));
+    StaticModel* water = waterNode_->CreateComponent<StaticModel>();
+    water->SetModel(cache->GetResource<Model>("Models/Plane.mdl"));
+    water->SetMaterial(cache->GetResource<Material>("Materials/Water.xml"));
 
-    // if (isClient) {
-    //     // Load Client Stuff
-    // } else {
-    //     boids.Initialise(cache, scene_);
-    // }
+    water->SetViewMask(0x80000000);
+
+    waterPlane_ = Plane(waterNode_->GetWorldRotation() * Vector3(0.0f, 1.0f, 0.0f), waterNode_->GetWorldPosition());
+
+    waterClipPlane_ = Plane(waterNode_->GetWorldRotation() * Vector3(0.0f, 1.0f, 0.0f),
+    waterNode_->GetWorldPosition() - Vector3(0.0f, 0.01f, 0.0f));
+
+    reflectionCameraNode_ = cameraNode_->CreateChild();
+    Camera* reflectionCamera = reflectionCameraNode_->CreateComponent<Camera>();
+    reflectionCamera->SetFarClip(50.0);
+    reflectionCamera->SetViewMask(0x7fffffff);
+    reflectionCamera->SetAutoAspectRatio(true);
+    reflectionCamera->SetUseReflection(true);
+    reflectionCamera->SetReflectionPlane(waterPlane_);
+    reflectionCamera->SetUseClipping(true);
+    reflectionCamera->SetClipPlane(waterClipPlane_);
+
+    reflectionCamera->SetAspectRatio((float)graphics->GetWidth() / (float)graphics->GetHeight());
+
+    int texSize = 1024;
+    SharedPtr<Texture2D> renderTexture(new Texture2D(context_));
+    renderTexture->SetSize(texSize, texSize, Graphics::GetRGBFormat(), TEXTURE_RENDERTARGET);
+    renderTexture->SetFilterMode(FILTER_BILINEAR);
+    RenderSurface* surface = renderTexture->GetRenderSurface();
+    SharedPtr<Viewport> rttViewport(new Viewport(context_, scene_, reflectionCamera));
+    surface->SetViewport(0, rttViewport);
+    Material* waterMat = cache->GetResource<Material>("Materials/Water.xml");
+    waterMat->SetTexture(TU_DIFFUSE, renderTexture);
+
+    Node* skyNode = scene_->CreateChild("Sky", LOCAL);
+    skyNode->SetScale(500.0f); // The scale actually does not matter
+    Skybox* skybox = skyNode->CreateComponent<Skybox>();
+    skybox->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+    skybox->SetMaterial(cache->GetResource<Material>("Materials/Skybox.xml"));
+
+    GetSubsystem<Renderer>()->SetViewport(0, new Viewport(context_, scene_, camera));
 }
 void Main::CreateClientObjects() {}
 void Main::CreateServerObjects() {
